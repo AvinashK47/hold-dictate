@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 hold-dictate.py - Hold-to-speak voice dictation daemon for Linux / Wayland.
-Pure Arch Linux implementation: uses evdev, PipeWire, whisper.cpp, and ydotool.
-Zero untrusted third-party binaries or AUR packages.
+Powered by whisper.cpp, PipeWire, evdev, and ydotool.
+Supports single keys and multi-key combos (e.g. KEY_RIGHTCTRL+KEY_RIGHTSHIFT).
 """
 
 import os
@@ -17,7 +17,7 @@ import evdev
 from evdev import ecodes
 
 # Default Configuration
-DEFAULT_KEY = "KEY_RIGHTCTRL"
+DEFAULT_KEY = "KEY_RIGHTCTRL+KEY_RIGHTSHIFT"
 DEFAULT_MODEL = os.path.expanduser("~/.local/share/whisper-models/ggml-small.en.bin")
 AUDIO_FILE = "/tmp/hold_dictate_recording.wav"
 MIN_DURATION = 0.35  # Ignore taps shorter than 350ms
@@ -82,12 +82,17 @@ def clean_transcription(text):
 
 
 class HoldDictateDaemon:
-    def __init__(self, key_name=DEFAULT_KEY, model_path=DEFAULT_MODEL):
-        self.key_name = key_name
-        self.key_code = getattr(ecodes, key_name, None)
-        if self.key_code is None:
-            print(f"[!] Error: Invalid evdev key name '{key_name}'", file=sys.stderr)
-            sys.exit(1)
+    def __init__(self, key_combo_str=DEFAULT_KEY, model_path=DEFAULT_MODEL):
+        self.key_combo_str = key_combo_str
+        self.key_names = [k.strip() for k in key_combo_str.split("+") if k.strip()]
+        self.key_codes = set()
+
+        for kn in self.key_names:
+            code = getattr(ecodes, kn, None)
+            if code is None:
+                print(f"[!] Error: Invalid evdev key name '{kn}' in '{key_combo_str}'", file=sys.stderr)
+                sys.exit(1)
+            self.key_codes.add(code)
 
         self.model_path = model_path
         if not os.path.isfile(self.model_path):
@@ -97,17 +102,18 @@ class HoldDictateDaemon:
         self.is_recording = False
         self.start_time = 0
         self.rec_proc = None
+        self.pressed_keys = set()
         self.selector = selectors.DefaultSelector()
         self.registered_devices = {}
         self.ydotool_socket = get_ydotool_socket()
 
         print(f"[*] Initialized Hold-to-Dictate:")
-        print(f"    - Target Key: {self.key_name} (code {self.key_code})")
+        print(f"    - Target Combo: {' + '.join(self.key_names)} (codes {self.key_codes})")
         print(f"    - Model: {self.model_path}")
         print(f"    - ydotool socket: {self.ydotool_socket}")
 
     def update_devices(self):
-        """Scan and register all input devices containing the target key."""
+        """Scan and register all input devices containing any of the target keys."""
         current_paths = set(evdev.list_devices())
         registered_paths = set(self.registered_devices.keys())
 
@@ -127,8 +133,9 @@ class HoldDictateDaemon:
                 dev = evdev.InputDevice(path)
                 caps = dev.capabilities()
                 if ecodes.EV_KEY in caps:
-                    keys = caps[ecodes.EV_KEY]
-                    if self.key_code in keys:
+                    keys = set(caps[ecodes.EV_KEY])
+                    # If this device has any of our combo keys
+                    if self.key_codes & keys:
                         self.selector.register(dev, selectors.EVENT_READ)
                         self.registered_devices[path] = dev
                         print(f"[+] Listening on device: {dev.name} ({path})")
@@ -140,7 +147,7 @@ class HoldDictateDaemon:
                 pass
 
     def start_recording(self):
-        """Called when key is pressed down."""
+        """Called when all keys in combo are pressed down."""
         if self.is_recording:
             return
         self.is_recording = True
@@ -153,8 +160,8 @@ class HoldDictateDaemon:
                 pass
 
         play_sound("Oxygen-Sys-App-Message")
-        show_notify("🎙️ Listening...", "Hold key while speaking, release to send", 10000)
-        print("\n[🎙️] Key DOWN: Recording audio...")
+        show_notify("🎙️ Listening...", f"Holding {' + '.join(self.key_names)}... Release to send", 10000)
+        print(f"\n[🎙️] Combo DOWN ({' + '.join(self.key_names)}): Recording audio...")
 
         self.rec_proc = subprocess.Popen(
             [
@@ -169,13 +176,13 @@ class HoldDictateDaemon:
         )
 
     def stop_recording_and_process(self):
-        """Called when key is released."""
+        """Called when any key in combo is released."""
         if not self.is_recording:
             return
         self.is_recording = False
         duration = time.time() - self.start_time
 
-        print(f"[⏹️] Key UP: Recording stopped ({duration:.2f}s).")
+        print(f"[⏹️] Combo UP: Recording stopped ({duration:.2f}s).")
 
         # Stop PipeWire recording cleanly with SIGINT
         if self.rec_proc and self.rec_proc.poll() is None:
@@ -226,7 +233,10 @@ class HoldDictateDaemon:
             except Exception as e:
                 print(f"[!] wl-copy warning: {e}")
 
-            # 2. Brief sleep so key release fully settles in compositor
+            # 2. Wait until all combo keys are physically released to avoid modifier conflicts
+            wait_start = time.time()
+            while self.pressed_keys and (time.time() - wait_start < 0.4):
+                time.sleep(0.02)
             time.sleep(0.06)
 
             # 3. Type into focused input field via ydotool
@@ -247,7 +257,7 @@ class HoldDictateDaemon:
             show_notify("🎙️ Dictation", "No speech detected", 1500)
 
     def run(self):
-        print(f"\n[🚀] Hold-to-Dictate is active! Hold down [{self.key_name}] to speak.\n")
+        print(f"\n[🚀] Hold-to-Dictate is active! Hold down [{' + '.join(self.key_names)}] to speak.\n")
         last_device_scan = 0
 
         while True:
@@ -261,11 +271,15 @@ class HoldDictateDaemon:
                 dev = key.fileobj
                 try:
                     for ev in dev.read():
-                        if ev.type == ecodes.EV_KEY and ev.code == self.key_code:
+                        if ev.type == ecodes.EV_KEY and ev.code in self.key_codes:
                             if ev.value == 1:       # Key Pressed Down
-                                self.start_recording()
+                                self.pressed_keys.add(ev.code)
+                                if self.key_codes.issubset(self.pressed_keys):
+                                    self.start_recording()
                             elif ev.value == 0:     # Key Released
-                                self.stop_recording_and_process()
+                                self.pressed_keys.discard(ev.code)
+                                if self.is_recording and not self.key_codes.issubset(self.pressed_keys):
+                                    self.stop_recording_and_process()
                             elif ev.value == 2:     # Key Held / Repeating
                                 pass
                 except (OSError, IOError):
@@ -279,7 +293,7 @@ def main():
     parser.add_argument(
         "--key",
         default=os.environ.get("DICTATE_KEY", DEFAULT_KEY),
-        help=f"Evdev key name to hold (default: {DEFAULT_KEY}, e.g. KEY_RIGHTALT, KEY_RIGHTCTRL, KEY_CAPSLOCK, KEY_F8)"
+        help=f"Evdev key name or combo to hold (default: {DEFAULT_KEY}, e.g. KEY_RIGHTCTRL+KEY_RIGHTSHIFT or KEY_RIGHTCTRL)"
     )
     parser.add_argument(
         "--model",
@@ -288,7 +302,7 @@ def main():
     )
     args = parser.parse_args()
 
-    daemon = HoldDictateDaemon(key_name=args.key, model_path=args.model)
+    daemon = HoldDictateDaemon(key_combo_str=args.key, model_path=args.model)
     try:
         daemon.run()
     except KeyboardInterrupt:
