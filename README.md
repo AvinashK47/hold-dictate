@@ -22,6 +22,22 @@ Hold down a key, speak naturally, and release. The speech is transcribed locally
 
 ---
 
+## Why This Exists (A Note from the Author)
+
+As a developer working constantly with AI coding agents, terminal tools, and browser workflows, I hit a real productivity bottleneck: **typing out complex thoughts manually is slow and breaks flow**.
+
+Explaining rich context, architecture plans, debugging scenarios, and refactoring instructions to an AI assistant in natural language requires writing dense paragraphs of technical text. Doing that by hand over and over created friction in my day-to-day work. I wanted to talk out loud at the speed of thought — using natural language, technical jargon, and natural punctuation — and have it instantly appear right in my prompt.
+
+When looking at existing Linux solutions, I found that:
+- Many were bloated Electron applications or required heavy, distracting GUI windows.
+- Cloud-based voice services sent private thoughts, proprietary code, and system context to third-party servers.
+- AUR packages were often fragile, unmaintained, or broke across rolling updates.
+- Lightweight tools frequently relied on older STT engines (like Vosk) that choked on developer vocabulary, camelCase, and modern library names.
+
+I built **hold-dictate** to solve this real-world problem for myself: a lightweight, 100% offline, privacy-respecting push-to-talk daemon that types directly into whatever field has focus (terminal, browser search tab, code editor, or AI chat bar) using only official Arch packages and local Whisper weights. Zero telemetry, zero bloat — just hold, speak, and create.
+
+---
+
 ## Features
 
 - **Hold-to-Talk (Push-to-Talk):** Press and hold `Right Ctrl + Right Shift` (or any single key/combo you configure) to speak; release to transcribe and type. Zero accidental triggers when using single-key shortcuts like `Ctrl+R`.
