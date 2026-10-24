@@ -1,0 +1,14 @@
+[Unit]
+Description=Hold-to-Dictate Voice Typing Daemon
+After=pipewire.service ydotool.service
+Wants=ydotool.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/hold-dictate.py
+Restart=always
+RestartSec=2
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
