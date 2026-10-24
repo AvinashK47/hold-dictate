@@ -24,7 +24,7 @@ Hold down a key, speak naturally, and release. The speech is transcribed locally
 
 ## Features
 
-- **Hold-to-Talk (Push-to-Talk):** Press and hold `Right Alt` (or any key you configure) to speak; release to transcribe and type.
+- **Hold-to-Talk (Push-to-Talk):** Press and hold `Right Ctrl` (or any key you configure) to speak; release to transcribe and type. Never interferes with browser menu bars or search focus.
 - **Wayland Native:** Uses `ydotool` via `/dev/uinput` to emulate a virtual hardware keyboard, bypassing Wayland window isolation restrictions. Works seamlessly across KDE Plasma, GNOME, Hyprland, Sway, and X11.
 - **100% Offline & Private:** Runs entirely on your machine using `whisper.cpp`. No audio leaves your computer.
 - **Accurate & Developer-Friendly:** Defaults to the `small.en` model (~466 MB), which excels at technical vocabulary, coding syntax, punctuation, and capitalization.
@@ -71,8 +71,8 @@ The installer will:
 ## Usage
 
 1. Focus any text field (terminal prompt, browser tab, IDE, or chat box).
-2. **Hold down `Right Alt`** and speak your prompt or instruction.
-3. **Release `Right Alt`**. The transcribed text will appear at your cursor within 1–2 seconds.
+2. **Hold down `Right Ctrl`** and speak your prompt or instruction.
+3. **Release `Right Ctrl`**. The transcribed text will appear at your cursor within 1–2 seconds.
 
 ### Viewing Live Logs
 
@@ -88,9 +88,9 @@ journalctl --user -u hold-dictate -f
 
 ### Changing the Trigger Key
 
-The default trigger key is `KEY_RIGHTALT` (AltGr), which is easily reached with your right thumb and does not emit characters on its own.
+The default trigger key is `KEY_RIGHTCTRL` (Right Control), which does not trigger menu bars or access keys in browsers and GUI apps.
 
-To change it to another key (e.g. `KEY_RIGHTCTRL`, `KEY_CAPSLOCK`, `KEY_F8`):
+To change it to another key (e.g. `KEY_RIGHTALT`, `KEY_CAPSLOCK`, `KEY_F8`):
 
 1. Edit the service configuration:
    ```bash
@@ -98,7 +98,7 @@ To change it to another key (e.g. `KEY_RIGHTCTRL`, `KEY_CAPSLOCK`, `KEY_F8`):
    ```
 2. Update the `ExecStart` line:
    ```ini
-   ExecStart=%h/.local/bin/hold-dictate.py --key KEY_RIGHTCTRL
+   ExecStart=%h/.local/bin/hold-dictate.py --key KEY_RIGHTALT
    ```
 3. Reload and restart:
    ```bash

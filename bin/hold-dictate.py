@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 hold-dictate.py - Hold-to-speak voice dictation daemon for Linux / Wayland.
-Powered by whisper.cpp, PipeWire, evdev, and ydotool.
+Pure Arch Linux implementation: uses evdev, PipeWire, whisper.cpp, and ydotool.
+Zero untrusted third-party binaries or AUR packages.
 """
 
 import os
@@ -16,7 +17,7 @@ import evdev
 from evdev import ecodes
 
 # Default Configuration
-DEFAULT_KEY = "KEY_RIGHTALT"
+DEFAULT_KEY = "KEY_RIGHTCTRL"
 DEFAULT_MODEL = os.path.expanduser("~/.local/share/whisper-models/ggml-small.en.bin")
 AUDIO_FILE = "/tmp/hold_dictate_recording.wav"
 MIN_DURATION = 0.35  # Ignore taps shorter than 350ms
